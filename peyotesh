@@ -1,0 +1,221 @@
+#!/usr/bin/env python
+
+import random
+
+import pygame
+
+from peyote import graphics
+from peyote import util
+
+from pygame.locals import *
+
+class PeyoteRunner(object):
+    
+    def __init__(self,interactive=False):
+        self.namespace = {}
+        self.context = graphics.Context(self.namespace)
+        self.__doc__ = {}
+        self._pageNumber = 1
+        self.frame = 1
+        
+    def _check_animation(self):
+        """Returns False if this is not an animation, True otherwise.
+        Throws an expection if the animation is not correct (missing a draw method)."""
+        
+        if not self.namespace.has_key('draw'):
+            raise graphics.PeyoteError('Not a correct animation: No draw() method.')
+        return True
+
+    def run(self, source_or_code):
+        self._initNamespace()
+        if isinstance(source_or_code, basestring):
+            source_or_code = compile(source_or_code + "\n\n", "<Untitled>", "exec")
+        exec source_or_code in self.namespace
+        if self._check_animation():
+            if self.namespace.has_key('setup'):
+                self.namespace['setup']()
+            self.namespace['draw']()
+        
+    def run_multiple(self, source_or_code, frames):
+        if isinstance(source_or_code, basestring):
+            source_or_code = compile(source_or_code + "\n\n", "<Untitled>", "exec")
+            
+        # First frame is special:
+        self.run(source_or_code)
+        yield 1
+        animation = self._check_animation()
+            
+        for i in range(frames-1):
+            self.context.clear((0,0,0))
+            self.frame = i + 2
+            self.namespace["PAGENUM"] = self.namespace["FRAME"] = self.frame
+            if animation:
+                self.namespace['draw']()
+            else:
+                exec source_or_code in self.namespace
+            yield self.frame
+
+    def run_interactive(self, source_or_code):
+        
+        pygame.init()
+        done = False
+        drawing = True
+
+        self._initNamespace()
+        self.namespace["PAGENUM"] = self.namespace["FRAME"] = self.frame = 1
+        self.namespace["DRAWING"] = True
+        if isinstance(source_or_code, basestring):
+            source_or_code = compile(source_or_code + "\n\n", "<Untitled>", "exec")
+
+        exec source_or_code in self.namespace
+
+        with self.context:
+            if self._check_animation():
+                if self.namespace.has_key('setup'):
+                    self.namespace['setup']()
+
+        screen_width = self.namespace.get('WIDTH', 256)
+        screen_height = self.namespace.get('HEIGHT', 256)
+        self.namespace['WIDTH'] = screen_width
+        self.namespace['HEIGHT'] = screen_height
+        
+        screen = pygame.display.set_mode((screen_width, screen_height), 0,32)
+        screen.fill((0,0,0))
+                
+        while not done:
+            if self.namespace["DRAWING"]:
+                self.namespace["PAGENUM"] = self.namespace["FRAME"] = self.frame
+
+                with self.context:
+                    for attrName in dir(self.context._cairo):
+                        if not attrName.startswith("_"):
+                            self.namespace[attrName] = getattr(self.context._cairo, attrName)
+                    self.namespace["PIXELS"] = self.context._pixels
+                    self.namespace['draw']()
+                    del self.namespace["PIXELS"]
+
+                if self.context._background:
+                    screen.fill(self.context._background)
+                screen.blit(self.context._surface, (0,0))
+                pygame.display.update()
+                self.frame += 1
+            
+            for e in pygame.event.get():
+                if e.type == QUIT or (e.type == KEYUP and e.key == K_ESCAPE):
+                    done = True
+                    break
+                elif e.type == KEYUP and e.key in (ord('p'), ord('P')):
+                    if self.namespace["DRAWING"]:
+                        print "Pausing on frame: %s" % self.frame
+                        self.namespace["DRAWING"] = False
+                    else:
+                        print "Restarting on frame: %s" % self.frame
+                        self.namespace["DRAWING"] = True
+                elif e.type == MOUSEBUTTONDOWN and e.button == 1:
+                    mouse_pos = list(e.pos)
+                    
+        
+    def _initNamespace(self, frame=1):
+        self.namespace.clear()
+        # Add everything from the namespace
+        for name in graphics.__all__:
+            self.namespace[name] = getattr(graphics, name)
+        for name in util.__all__:
+            self.namespace[name] = getattr(util, name)
+        # Add everything from the context object
+
+        self.namespace["_ctx"] = self.context
+        for attrName in dir(self.context):
+            if not attrName.startswith("_"):
+                self.namespace[attrName] = getattr(self.context, attrName)
+
+        # Add the document global
+        self.namespace["__doc__"] = self.__doc__
+        # Add the frame
+        self.frame = frame
+        self.namespace["PAGENUM"] = self.namespace["FRAME"] = self.frame
+        
+def make_image(source_or_code, outputfile):
+    
+    """Given a source string or code object, executes the scripts and saves the result as an image.
+    Supported image extensions: pdf, tiff, png, jpg, gif"""
+    
+    runner = PeyoteRunner()
+    runner.run(source_or_code)
+    pygame.image.save(runner.canvas,outputfile)
+    
+def make_movie(source_or_code, outputfile, frames, fps=30):
+
+    """Given a source string or code object, executes the scripts and saves the result as a movie.
+    You also have to specify the number of frames to render.
+    Supported movie extension: mov"""
+
+    runner = PeyoteRunner()
+    for frame in runner.run_multiple(source_or_code, frames):
+        pass
+    
+    '''
+    from nodebox.util import QTSupport
+    movie = QTSupport.Movie(outputfile, fps)
+    for frame in runner.run_multiple(source_or_code, frames):
+        movie.add(runner.canvas)
+    movie.save()
+    '''
+    return
+
+def make_interactive(source_or_code):
+    runner = PeyoteRunner()
+    runner.run_interactive(source_or_code)
+
+def usage(err=""):
+    if len(err) > 0:
+        err = '\n\nError: ' + str(err)
+    print """Peyote console runner
+Usage: console.py sourcefile imagefile
+   or: console.py sourcefile moviefile number_of_frames [fps]
+Supported image extensions: pdf, tiff, png, jpg, gif
+Supported movie extension:  mov""" + err
+
+def main():
+    import sys, os
+    print "Arg count: %s" % len(sys.argv)
+    if len(sys.argv) < 2:
+        usage()
+    elif len(sys.argv) == 2:
+        make_interactive(open(sys.argv[1]).read())
+    elif len(sys.argv) == 3: # Should be an image
+        basename, ext = os.path.splitext(sys.argv[2])
+        if ext not in ('.pdf', '.gif', '.jpg', '.jpeg', '.png', '.tiff'):
+            return usage('This is not a supported image format.')
+        make_image(open(sys.argv[1]).read(), sys.argv[2])
+    elif len(sys.argv) == 4 or len(sys.argv) == 5: # Should be a movie
+        basename, ext = os.path.splitext(sys.argv[2])
+        if ext != '.mov':
+            return usage('This is not a supported movie format.')
+        if len(sys.argv) == 5:
+            try:
+                fps = int(sys.argv[4])
+            except ValueError:
+                return usage()
+        else:
+            fps = 30
+        make_movie(open(sys.argv[1]).read(), sys.argv[2], int(sys.argv[3]), fps)
+
+def test():
+    # Creating the PeyoteRunner class directly:
+    runner = NodeBoxRunner()
+    runner.run('size(500,500)\nfor i in range(400):\n  oval(random(WIDTH),random(HEIGHT),50,50, fill=(random(), 0,0,random()))')
+    runner.canvas.save('console-test.pdf')
+    runner.canvas.save('console-test.png')
+    
+    # Using the runner for animations:
+    runner = NodeBoxRunner()
+    for frame in runner.run_multiple('size(300, 300)\ntext(FRAME, 100, 100)', 10):
+        runner.canvas.save('console-test-frame%02i.png' % frame)
+
+    # Using the shortcut functions:
+    make_image('size(200,200)\ntext(FRAME, 100, 100)', 'console-test.gif')
+    make_movie('size(200,200)\ntext(FRAME, 100, 100)', 'console-test.mov', 10)
+
+if __name__=='__main__':
+    main()
