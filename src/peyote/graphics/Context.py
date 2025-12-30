@@ -32,7 +32,7 @@ class Context:
         return self._surface.map_rgb(color)
 
     def unmap_rgb(self, color_int):
-        return self._surface.unmap_rgb(color)
+        return self._surface.unmap_rgb(color_int)
 
     def blit(self, surf, coord):
         self._surface.blit(surf, coord)
