@@ -13,6 +13,8 @@ dependencies = [
     "pydantic_settings",
     "numpy",
     "pyside6",
+    "pygame-ce",
+    "pycairo",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
