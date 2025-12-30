@@ -188,6 +188,14 @@ lint.ignore = [
   # subprocess-without-shell-equals-true (S603)
   "S603",
 ]
+"src/peyote/graphics/*" = [
+  # Legacy code - ignore all linting rules for now
+  "ALL",
+]
+"src/peyote/util/*" = [
+  # Legacy code - ignore all linting rules for now
+  "ALL",
+]
 
 [tool.ty]
 
