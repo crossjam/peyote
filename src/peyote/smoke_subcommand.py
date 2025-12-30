@@ -39,6 +39,8 @@ class FramebufferWidget(QWidget):
         )
 
         # Keep a reference to prevent GC surprises
+        # The _buf attribute prevents NumPy array from being garbage collected
+        # while QImage still references its memory (SLF001: private member access)
         self.qimg._buf = self.buf  # noqa: SLF001
 
         self.t = 0
@@ -74,6 +76,9 @@ class FramebufferWidget(QWidget):
     def paintEvent(self, event: QPaintEvent) -> None:  # noqa: N802, ARG002
         """Handle paint events by drawing the framebuffer to the widget.
 
+        Note: paintEvent is a Qt framework method override (N802: Qt naming convention).
+        The event parameter is required by Qt's interface but unused (ARG002).
+
         Args:
             event: The paint event
 
@@ -83,6 +88,9 @@ class FramebufferWidget(QWidget):
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
         """Handle key press events.
+
+        Note: keyPressEvent is a Qt framework method override
+        (N802: Qt naming convention).
 
         Args:
             event: The key event
