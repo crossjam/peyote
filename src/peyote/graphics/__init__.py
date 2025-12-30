@@ -1,7 +1,9 @@
+"""Graphics module for peyote."""
+
 __all__ = ['Context', 'Canvas', 'PeyoteError']
 
-from Context import Context
-from Canvas import Canvas
+from .Context import Context
+from .Canvas import Canvas
 
 import pygame
 
