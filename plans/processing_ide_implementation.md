@@ -1,7 +1,7 @@
 # Processing-like IDE Implementation Plan
 
 **Created:** 2025-12-30  
-**Last Updated:** 2025-12-30 (Revised code execution strategy to use importlib)  
+**Last Updated:** 2025-12-30 (Removed Drawing API implementation; focused on IDE UI and sketch execution)  
 **Status:** Draft for Review
 
 ---
@@ -22,23 +22,27 @@ This plan addresses the requirements specified in `./plans/processing_ide_plan.m
 ### Objective
 Create a PySide6-based GUI application that provides a Processing-like development environment for Python generative art, specifically designed to:
 1. Edit Python code (not Java-like Processing code)
-2. Execute user code against a framebuffer for real-time visualization
-3. Integrate with the existing `FramebufferWidget` architecture (from `src/peyote/smoke_subcommand.py`)
+2. Launch and execute Python sketch modules
+3. Integrate with the existing `FramebufferWidget` architecture (from `src/peyote/smoke_subcommand.py`) for display
 4. Support both real-time display and offline rendering (GIF/PNG export)
 5. Provide an intuitive, artist-friendly interface
+
+**Note:** This plan focuses on the IDE UI components and sketch execution mechanism. The drawing API that sketches will use is out of scope for this plan and will be addressed separately.
 
 ### Requirements Summary
 From the high-level spec:
 - **GUI Framework:** PySide6 (Qt for Python)
 - **Code Editor:** Python syntax highlighting, line numbers
 - **Display Window:** Real-time rendering using existing FramebufferWidget or similar
-- **Execution Model:** Run user Python code with access to drawing primitives
+- **Execution Model:** Load and run user Python modules (sketches)
 - **Rendering Modes:** 
   - Interactive mode: real-time display window
   - Offline mode: render to GIF/PNG files
 - **Architecture:** Keep class hierarchy flat; avoid over-engineering
 - **Integration:** New command group/subcommand in peyote CLI
 - **Testing:** Offscreen widget tests with image validation
+
+**Out of Scope:** Implementation of the drawing API itself (functions like `ellipse()`, `rect()`, etc.). The IDE will load and execute sketch modules, but the specific drawing primitives available to sketches will be defined separately.
 
 ### Reference Image Analysis
 The provided Processing IDE screenshot shows:
@@ -157,6 +161,8 @@ Load user code as Python modules using `importlib`, then introspect for Processi
 - Introspect module for `setup` and `draw` functions using `hasattr()` or `getattr()`
 - Execute functions in controlled manner
 - Support module reloading for iterative development
+
+**Note:** The specific functions/API available within sketches (drawing primitives, etc.) is out of scope for this IDE plan.
 
 **Pros:**
 - Proper Python module semantics (imports work naturally)
@@ -338,7 +344,7 @@ VS Code's editor in a web view.
 ---
 
 ### Phase 4: Code Execution Engine
-**Goal:** Execute user Python code and provide drawing API using module loading.
+**Goal:** Load and execute user Python sketch modules using importlib.
 
 **Tasks:**
 - [ ] Create `execution_engine.py` with `SketchExecutor` class
@@ -352,25 +358,6 @@ VS Code's editor in a web view.
   - [ ] Execute module with `spec.loader.exec_module()`
   - [ ] Introspect module for `setup` and `draw` functions using `hasattr()`
   - [ ] Support module reloading with `importlib.reload()` for iterative development
-- [ ] Design user-facing drawing API (Processing-like functions):
-  - [ ] `setup()` - called once at start
-  - [ ] `draw()` - called every frame
-  - [ ] `size(width, height)` - set canvas size
-  - [ ] `background(r, g, b)` - clear with color
-  - [ ] `fill(r, g, b)` - set fill color
-  - [ ] `stroke(r, g, b)` - set stroke color
-  - [ ] `no_stroke()` - disable stroke
-  - [ ] `no_fill()` - disable fill
-  - [ ] `ellipse(x, y, w, h)` - draw ellipse
-  - [ ] `rect(x, y, w, h)` - draw rectangle
-  - [ ] `line(x1, y1, x2, y2)` - draw line
-  - [ ] `point(x, y)` - draw point
-  - [ ] `text(string, x, y)` - draw text
-  - [ ] Mouse/keyboard state variables: `mouse_x`, `mouse_y`, `mouse_pressed`
-  - [ ] Frame state: `frame_count`
-- [ ] Implement drawing API module injection:
-  - [ ] Make drawing API available as importable module (e.g., `from peyote.sketch import *`)
-  - [ ] Or inject into module's namespace before execution
 - [ ] Implement `SketchExecutor.load_and_run(code_string)`:
   - [ ] Save code to temporary file
   - [ ] Load module using importlib
@@ -385,7 +372,7 @@ VS Code's editor in a web view.
   - [ ] Handle reload on code changes (hot-reload)
 - [ ] Integrate with Display Widget:
   - [ ] Connect executor to FramebufferWidget
-  - [ ] Pass QPainter to drawing functions
+  - [ ] Allow sketch module to access the display widget for rendering
   - [ ] Update display after each draw() call
 - [ ] Implement Play/Stop button functionality:
   - [ ] Play: save code, load module, start execution
@@ -393,17 +380,18 @@ VS Code's editor in a web view.
 
 **Files to create:**
 - `src/peyote/ide/execution_engine.py`
-- `src/peyote/ide/drawing_api.py` (or `src/peyote/sketch/__init__.py`)
 - `src/peyote/ide/module_loader.py` (helper for importlib operations)
 
 **Acceptance:**
 - Can write simple sketch with setup() and draw()
 - Play button runs the sketch by loading it as a module
 - Stop button halts execution and unloads module
-- Drawing functions render to display
+- Sketch code can access display widget for rendering
 - Errors show in console with proper tracebacks
 - Can reload sketch after code changes (hot-reload)
 - Imports work naturally in sketch code (e.g., `import math`)
+
+**Note:** The specific API that sketches use for drawing is out of scope. This phase focuses on the module loading and execution infrastructure.
 
 ---
 
@@ -607,36 +595,6 @@ VS Code's editor in a web view.
 
 ---
 
-### Phase 11: Advanced Drawing API (Optional Future Work)
-**Goal:** Expand drawing capabilities beyond basic shapes.
-
-**Tasks (Future):**
-- [ ] Add transformation functions:
-  - [ ] `translate(x, y)`
-  - [ ] `rotate(angle)`
-  - [ ] `scale(sx, sy)`
-  - [ ] `push()` / `pop()` for transform stack
-- [ ] Add advanced shapes:
-  - [ ] `bezier(x1, y1, cx1, cy1, cx2, cy2, x2, y2)`
-  - [ ] `polygon(points)`
-  - [ ] `arc(x, y, w, h, start, stop)`
-- [ ] Add image loading:
-  - [ ] `load_image(path)`
-  - [ ] `image(img, x, y, w, h)`
-- [ ] Add noise/random utilities:
-  - [ ] `random(min, max)`
-  - [ ] `noise(x, y)` (Perlin noise)
-- [ ] Add color utilities:
-  - [ ] `color(r, g, b, a)`
-  - [ ] `lerp_color(c1, c2, amt)`
-  - [ ] `hsv_to_rgb(h, s, v)`
-- [ ] Add NumPy buffer access:
-  - [ ] `pixels` array for direct manipulation
-  - [ ] `load_pixels()` / `update_pixels()`
-
-**Files to expand:**
-- `src/peyote/ide/drawing_api.py`
-
 ---
 
 ## Testing Strategy
@@ -650,31 +608,28 @@ VS Code's editor in a web view.
 - [ ] Comment toggle works
 
 **Execution Engine Tests** (`tests/test_execution_engine.py`):
-- [ ] User code executes in isolated namespace
-- [ ] setup() called once, draw() called repeatedly
+- [ ] User code loads as Python module
+- [ ] setup() called once, draw() called repeatedly (if present in sketch)
 - [ ] Exceptions are caught and reported
 - [ ] stdout/stderr captured correctly
-
-**Drawing API Tests** (`tests/test_drawing_api.py`):
-- [ ] Each drawing function renders correctly
-- [ ] Coordinate system is correct
-- [ ] Colors are applied correctly
+- [ ] Module reloading works correctly
 
 ### Integration Tests
 
 **Offscreen Rendering Tests** (`tests/test_offscreen_rendering.py`):
 - [ ] Create OffscreenWidget
-- [ ] Run simple sketch (draw red circle)
+- [ ] Run simple sketch that renders something
 - [ ] Save PNG
 - [ ] Verify PNG exists and has correct dimensions
-- [ ] Load PNG with PIL and check pixel colors match expected
+- [ ] Load PNG with PIL and verify it was modified from blank
 - [ ] Test GIF export with multiple frames
 - [ ] Verify GIF animation
 
 **Sketch Execution Tests** (`tests/test_sketch_execution.py`):
 - [ ] Execute example sketches without errors
-- [ ] Verify output is rendered (compare against reference images)
+- [ ] Verify module loading and unloading
 - [ ] Test error handling (syntax errors, runtime errors)
+- [ ] Test hot-reload functionality
 
 ### Manual Testing
 
@@ -698,15 +653,13 @@ VS Code's editor in a web view.
 - [ ] Verify no memory leaks (run for extended period)
 
 ### Reference Image Tests (Automated)
-Create a suite of canonical sketches and reference images:
-1. **test_basic_shapes.py**: Draw circle, rectangle, line
-   - Compare output PNG against reference PNG
-   - Allow small tolerance for anti-aliasing differences
-2. **test_colors.py**: Draw colored shapes
-   - Verify RGB values in specific pixel locations
-3. **test_animation.py**: Animated sketch (10 frames)
+Create a suite of canonical sketches and reference images to test the execution infrastructure:
+1. **test_module_loading.py**: Simple sketch that renders something
+   - Verify module loads and executes without error
+   - Compare output PNG to verify rendering occurred
+2. **test_animation.py**: Animated sketch (10 frames)
    - Verify frame_count increments
-   - Verify shapes move correctly
+   - Verify display updates each frame
 
 **Test Framework:**
 - Use pytest
@@ -714,7 +667,7 @@ Create a suite of canonical sketches and reference images:
 - Use `pytest-qt` for Qt widget testing
 - Store reference images in `tests/reference_images/`
 - Generate test images in `tests/output_images/`
-- Use MSE (Mean Squared Error) or SSIM for image comparison
+- Basic validation that rendering occurred (image changed from blank)
 
 ---
 
@@ -841,29 +794,31 @@ The implementation will be considered complete and successful when:
 - **Code Editor:** ~400 lines
 - **Display Widgets:** ~300 lines
 - **Execution Engine:** ~400 lines
-- **Drawing API:** ~500 lines
 - **File Operations:** ~200 lines
 - **Export:** ~200 lines
 - **CLI Integration:** ~100 lines
 - **Settings:** ~200 lines
-- **Tests:** ~800 lines
+- **Tests:** ~600 lines
 
-**Total:** ~3,400 lines
+**Total:** ~2,700 lines
+
+**Note:** Drawing API implementation (out of scope) would add an estimated ~500 lines.
 
 ---
 
 ## Future Enhancements (Out of Scope for v1)
 
-1. **Debugger Integration:** Breakpoints, step through, variable inspection
-2. **Variable Inspector Panel:** Live view of sketch variables
-3. **Performance Profiler:** Identify slow draw() calls
-4. **Snippet Library:** Pre-built code templates
-5. **Community Sharing:** Upload/download sketches from web
-6. **3D Rendering:** OpenGL-based 3D drawing API
-7. **Video Export:** MP4/MOV export with audio
-8. **Multi-file Projects:** Import local modules in sketches
-9. **Git Integration:** Version control for sketches
-10. **Live Coding Mode:** Code changes reflected immediately without restart
+1. **Drawing API Implementation:** Design and implement the Processing-like drawing primitives that sketches will use (ellipse, rect, line, etc.)
+2. **Debugger Integration:** Breakpoints, step through, variable inspection
+3. **Variable Inspector Panel:** Live view of sketch variables
+4. **Performance Profiler:** Identify slow draw() calls
+5. **Snippet Library:** Pre-built code templates
+6. **Community Sharing:** Upload/download sketches from web
+7. **3D Rendering:** OpenGL-based 3D drawing capabilities
+8. **Video Export:** MP4/MOV export with audio
+9. **Multi-file Projects:** Import local modules in sketches
+10. **Git Integration:** Version control for sketches
+11. **Live Coding Mode:** Code changes reflected immediately without restart
 
 ---
 
@@ -873,21 +828,18 @@ The implementation will be considered complete and successful when:
    - Should display pane be detachable (like Processing)? Or always integrated?
    - **Recommendation:** Start integrated, add detach feature later if needed.
 
-2. **Drawing API Compatibility:**
-   - Should we match Processing's API exactly (e.g., `rect(x, y, w, h)`) or use more Pythonic names?
-   - **Recommendation:** Match Processing for familiarity, but use Python naming conventions (e.g., `background()` not `background()`).
+2. **Frame Rate Control:**
+   - Should frame rate be fixed at 60 FPS or configurable?
+   - **Recommendation:** Start with fixed 60 FPS, make configurable later if needed.
 
-3. **Frame Rate Control:**
-   - Should users be able to set FPS (e.g., `frame_rate(30)`)? Or fixed at 60?
-   - **Recommendation:** Start with fixed 60 FPS, add `frame_rate()` in Phase 11.
-
-4. **NumPy API Exposure:**
-   - Should users have direct access to the framebuffer NumPy array for pixel manipulation?
-   - **Recommendation:** Yes, as `pixels` global in Phase 11. This enables advanced techniques.
-
-5. **Error Recovery:**
+3. **Error Recovery:**
    - When draw() throws exception, should we halt execution or keep running and show error?
    - **Recommendation:** Halt execution, show error, allow user to fix and restart.
+
+4. **Sketch Module Interface:**
+   - How should sketches access the display widget for rendering?
+   - Should there be a standard module/API they import, or is it passed as a parameter?
+   - **Recommendation:** To be determined based on drawing API design (out of scope for this plan).
 
 ---
 
@@ -906,3 +858,4 @@ The implementation will be considered complete and successful when:
 
 - **v1.0 (2025-12-30):** Initial draft for review
 - **v1.1 (2025-12-30):** Updated code execution strategy from `exec()` to importlib-based module loading for better isolation, natural import support, and cleaner error handling
+- **v1.2 (2025-12-30):** Removed Drawing API implementation from scope; focused plan on IDE UI components and sketch module loading/execution infrastructure. Drawing API design deferred to separate effort.
