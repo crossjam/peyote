@@ -40,3 +40,8 @@ uv run python -m peyote --help
 # list tasks
 poe
 ```
+
+## Planning
+
+If asked to generate a plan, follow the guidance in
+@plans/PLAN_TEMPLATE.md
