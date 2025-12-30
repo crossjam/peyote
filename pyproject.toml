@@ -11,6 +11,8 @@ dependencies = [
     "loguru",
     "typer",
     "pydantic_settings",
+    "numpy",
+    "pyside6",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",

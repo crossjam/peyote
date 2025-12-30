@@ -10,6 +10,7 @@ from loguru import logger
 
 from .self_subcommand import cli as self_cli
 from .settings import Settings
+from .smoke_subcommand import cli as smoke_cli
 
 cli = typer.Typer()
 
@@ -17,6 +18,12 @@ cli.add_typer(
     self_cli,
     name="self",
     help="Manage the peyote command.",
+)
+
+cli.add_typer(
+    smoke_cli,
+    name="smoke",
+    help="Run smoke test of Pyside6 integration.",
 )
 
 
