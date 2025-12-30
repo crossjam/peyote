@@ -1,0 +1,206 @@
+name: Test, Publish and Release
+
+on:
+  push:
+    branches:
+      - testing
+    tags:
+      - 'v*-test'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: read
+
+jobs:
+  get-python-versions:
+    name: Get Python test versions from pyproject.toml
+    runs-on: ubuntu-latest
+    outputs:
+      python-versions: ${{ steps.extract.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+      - name: Extract Python test versions
+        id: extract
+        run: |
+          # Try to extract test versions from pyproject.toml, fallback to default if missing
+          if versions=$(uv run toml get --toml-path pyproject.toml tool.peyote.ci.test-python-versions 2>/dev/null); then
+            echo "Using Python versions from pyproject.toml: $versions"
+            echo "versions=$versions" >> $GITHUB_OUTPUT
+          else
+            echo "No test-python-versions found in pyproject.toml, using default versions"
+            echo 'versions=['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14']' >> $GITHUB_OUTPUT
+          fi
+
+  test:
+    name: Test
+    needs: get-python-versions
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+        python-version: ${{ fromJSON(needs.get-python-versions.outputs.python-versions) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and set Python version.
+        uses: astral-sh/setup-uv@v6
+        with:          
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+
+      - name: Run tests - ${{ matrix.python-version }} - ${{ matrix.os }}        
+        run: |
+          uv run --all-extras pytest
+
+  build:
+    name: Build Package
+    needs: test
+    if: |
+      github.ref_type == 'tag' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      !endsWith(github.ref, '-test') &&
+      success()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Build package
+        run: |
+          uv build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-files
+          path: dist/
+          retention-days: 1  # Minimum allowed, but artifacts are only needed within same workflow
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    if: |
+      github.ref_type == 'tag' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      !endsWith(github.ref, '-test') &&
+      success()
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/peyote
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-files
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: Create GitHub Release & Update Changelog
+    needs: build
+    if: |
+      github.ref_type == 'tag' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      !endsWith(github.ref, '-test') &&
+      success()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-files
+          path: dist/
+
+      - name: Auto-generate Changelog
+        uses: BobAnkh/auto-generate-changelog@v1.2.5
+        with:
+          REPO_NAME: 'crossjam/peyote'
+          ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PATH: 'CHANGELOG.md'
+          COMMIT_MESSAGE: 'docs(CHANGELOG): update release notes'
+          TYPE: 'feat:Feature,bug:Bug Fixes,fix:Bug Fixes,docs:Documentation,refactor:Refactor,perf:Performance Improvements'
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          set -euo pipefail
+          
+          # Get the tag name
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "Generating release notes for tag: $TAG_NAME"
+          
+          # Get the previous tag
+          if PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${TAG_NAME}^ 2>/dev/null); then
+            echo "Previous tag found: $PREVIOUS_TAG"
+            echo "## Changes since $PREVIOUS_TAG" >> release_notes.md
+            echo "" >> release_notes.md
+            git log --pretty=format:"- %s (%h)" ${PREVIOUS_TAG}..${TAG_NAME} >> release_notes.md
+          else
+            echo "No previous tag found, generating initial release notes"
+            echo "## Initial Release" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "- Initial release of peyote" >> release_notes.md
+          fi
+          
+          # Check if there's a CHANGELOG.md file
+          if [[ -f "CHANGELOG.md" ]]; then
+            echo "Adding CHANGELOG.md reference"
+            echo "" >> release_notes.md
+            echo "## Full Changelog" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "See [CHANGELOG.md](CHANGELOG.md) for complete release notes." >> release_notes.md
+          fi
+          
+          echo "Generated release notes:"
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "dist/*"
+          bodyFile: "release_notes.md"
+          draft: false
+          prerelease: false
+          generateReleaseNotes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-docs:
+    name: Deploy Documentation
+    needs: [publish, github-release]
+    if: |
+      github.ref_type == 'tag' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      !endsWith(github.ref, '-test') &&
+      success()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Trigger docs deployment
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: release-complete
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+
+
