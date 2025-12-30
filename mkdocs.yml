@@ -1,0 +1,68 @@
+site_name: Generative Computational Hallucinatory Art
+site_description: Create visually attractive computational artifacts
+site_author: Brian Dennis
+site_url: https://crossjam.github.io/peyote/
+
+repo_name: crossjam/peyote
+repo_url: https://github.com/crossjam/peyote
+
+theme:
+  name: readthedocs
+  highlightjs: true
+  hljs_languages:
+    - yaml
+    - python
+
+plugins:
+  - search
+
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_source: true
+            show_bases: true
+            show_root_heading: true
+            show_object_full_path: true
+            show_category_heading: true
+            show_if_no_docstring: true
+            inherited_members: true
+            members_order: source
+            separate_signature: true
+            unwrap_annotated: true
+            filters: ["!^_"]
+            merge_init_into_class: true
+
+
+
+nav:
+  - Home: index.md
+  - Installation: getting-started/installation.md
+  - Quick Start: getting-started/quickstart.md
+  - Configuration: getting-started/configuration.md
+  - CLI Usage: user-guide/cli.md
+  - Examples: user-guide/examples.md
+  - API Reference: reference/
+  - Contributing: contributing.md
+  - Changelog: changelog.md
+
+
+
+markdown_extensions:
+  - codehilite
+  - admonition
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/crossjam/peyote
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/peyote/
