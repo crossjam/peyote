@@ -1,7 +1,7 @@
 # Processing-like IDE Implementation Plan
 
 **Created:** 2025-12-30  
-**Last Updated:** 2025-12-30  
+**Last Updated:** 2025-12-30 (Revised code execution strategy to use importlib)  
 **Status:** Draft for Review
 
 ---
@@ -148,17 +148,28 @@ DisplayWindow (QWidget)
 
 ### Code Execution Strategies
 
-#### Option A: Direct exec() in Isolated Namespace (Recommended)
-Execute user code using Python's `exec()` with a custom namespace containing drawing functions.
+#### Option A: Module Loading via importlib (Recommended)
+Load user code as Python modules using `importlib`, then introspect for Processing-like functions (`setup()`, `draw()`, etc.). Code entered in the IDE will be written to temporary files and loaded using this mechanism.
+
+**Implementation:**
+- Save editor content to temporary `.py` file in a temp directory
+- Use `importlib.util.spec_from_file_location()` and `importlib.util.module_from_spec()` to load module
+- Introspect module for `setup` and `draw` functions using `hasattr()` or `getattr()`
+- Execute functions in controlled manner
+- Support module reloading for iterative development
 
 **Pros:**
-- Simple and direct
-- Full Python language support
-- Easy to provide custom APIs
+- Proper Python module semantics (imports work naturally)
+- Better isolation than `exec()`
+- Cleaner introspection and error handling
+- Supports relative imports and package structure
+- Can use standard Python debugging tools
+- Module reloading allows iterative development without restart
 
 **Cons:**
-- Security concerns (but acceptable for local dev tool)
-- Error handling requires careful design
+- Slightly more complex than `exec()`
+- Need to manage temporary files
+- Module caching considerations (must use `importlib.reload()`)
 
 #### Option B: Subprocess Execution
 Run user code in a separate Python subprocess.
@@ -173,20 +184,19 @@ Run user code in a separate Python subprocess.
 - More complex architecture
 - Slower startup
 
-#### Option C: IPython/Jupyter Integration
-Embed IPython kernel for code execution.
+#### Option C: Direct exec() in Isolated Namespace
+Execute user code using Python's `exec()` with a custom namespace containing drawing functions.
 
 **Pros:**
-- Rich introspection
-- Cell-based execution
-- Variable inspection
+- Simple and direct
+- No temporary files needed
 
 **Cons:**
-- Heavy dependency
-- Overkill for use case
-- Slower startup
+- Security concerns (but acceptable for local dev tool)
+- Imports don't work naturally
+- Less clean error handling
 
-**Decision:** Use **Option A** for initial implementation, with namespace isolation and exception handling.
+**Decision:** Use **Option A** (importlib module loading) for initial implementation, with proper module lifecycle management and hot-reloading support.
 
 ---
 
@@ -328,10 +338,20 @@ VS Code's editor in a web view.
 ---
 
 ### Phase 4: Code Execution Engine
-**Goal:** Execute user Python code and provide drawing API.
+**Goal:** Execute user Python code and provide drawing API using module loading.
 
 **Tasks:**
 - [ ] Create `execution_engine.py` with `SketchExecutor` class
+- [ ] Implement temporary file management:
+  - [ ] Create temp directory for sketch modules (e.g., `~/.peyote/sketches/`)
+  - [ ] Write editor content to `.py` file in temp directory
+  - [ ] Generate unique module names to avoid conflicts
+- [ ] Implement module loading with importlib:
+  - [ ] Use `importlib.util.spec_from_file_location()` to create module spec
+  - [ ] Use `importlib.util.module_from_spec()` to load module
+  - [ ] Execute module with `spec.loader.exec_module()`
+  - [ ] Introspect module for `setup` and `draw` functions using `hasattr()`
+  - [ ] Support module reloading with `importlib.reload()` for iterative development
 - [ ] Design user-facing drawing API (Processing-like functions):
   - [ ] `setup()` - called once at start
   - [ ] `draw()` - called every frame
@@ -348,31 +368,42 @@ VS Code's editor in a web view.
   - [ ] `text(string, x, y)` - draw text
   - [ ] Mouse/keyboard state variables: `mouse_x`, `mouse_y`, `mouse_pressed`
   - [ ] Frame state: `frame_count`
-- [ ] Implement `SketchExecutor.execute(code_string)`:
-  - [ ] Parse and validate code
-  - [ ] Create isolated namespace with drawing API
-  - [ ] Call user's `setup()` once
-  - [ ] Start timer to call user's `draw()` at ~60fps
-  - [ ] Handle exceptions gracefully
-  - [ ] Route print statements to console widget
+- [ ] Implement drawing API module injection:
+  - [ ] Make drawing API available as importable module (e.g., `from peyote.sketch import *`)
+  - [ ] Or inject into module's namespace before execution
+- [ ] Implement `SketchExecutor.load_and_run(code_string)`:
+  - [ ] Save code to temporary file
+  - [ ] Load module using importlib
+  - [ ] Validate that module has required functions
+  - [ ] Call user's `setup()` once (if present)
+  - [ ] Start timer to call user's `draw()` at ~60fps (if present)
+  - [ ] Handle exceptions gracefully with full traceback
+  - [ ] Route print statements to console widget (capture stdout)
+- [ ] Implement module lifecycle management:
+  - [ ] Stop previous sketch before loading new one
+  - [ ] Cleanup old modules and temp files
+  - [ ] Handle reload on code changes (hot-reload)
 - [ ] Integrate with Display Widget:
   - [ ] Connect executor to FramebufferWidget
   - [ ] Pass QPainter to drawing functions
   - [ ] Update display after each draw() call
 - [ ] Implement Play/Stop button functionality:
-  - [ ] Play: start execution
-  - [ ] Stop: halt execution, clear display
+  - [ ] Play: save code, load module, start execution
+  - [ ] Stop: halt execution, unload module, clear display
 
 **Files to create:**
 - `src/peyote/ide/execution_engine.py`
-- `src/peyote/ide/drawing_api.py`
+- `src/peyote/ide/drawing_api.py` (or `src/peyote/sketch/__init__.py`)
+- `src/peyote/ide/module_loader.py` (helper for importlib operations)
 
 **Acceptance:**
 - Can write simple sketch with setup() and draw()
-- Play button runs the sketch
-- Stop button halts execution
+- Play button runs the sketch by loading it as a module
+- Stop button halts execution and unloads module
 - Drawing functions render to display
-- Errors show in console
+- Errors show in console with proper tracebacks
+- Can reload sketch after code changes (hot-reload)
+- Imports work naturally in sketch code (e.g., `import math`)
 
 ---
 
@@ -721,14 +752,22 @@ dev = [
 ## Security and Safety Considerations
 
 ### Code Execution Security
-**Risk:** User code executed via `exec()` has full access to Python runtime.
+**Risk:** User code loaded as Python modules has full access to Python runtime and can import any module.
 
 **Mitigations:**
 1. **Documentation:** Clearly document that the IDE is a local development tool, not for running untrusted code.
-2. **Namespace Isolation:** Provide limited globals to user code (no `import os`, `import sys` by default).
-3. **Future Enhancement:** Consider restricted execution environment (e.g., RestrictedPython) if needed.
+2. **Module Isolation:** Each sketch runs as a separate module in a controlled namespace.
+3. **Temporary File Management:** Sketch files stored in dedicated temp directory with proper cleanup.
+4. **No Automatic Execution:** Sketches only run when user explicitly clicks Play button.
+5. **Future Enhancement:** Consider restricted execution environment (e.g., RestrictedPython) if needed.
 
-**Decision:** For v1, this is acceptable as a local dev tool. Users are running their own code.
+**Advantages of importlib approach:**
+- More predictable behavior than `exec()`
+- Standard Python module semantics for error handling
+- Better stack traces and debugging
+- Imports work naturally (user code can `import math`, etc.)
+
+**Decision:** For v1, this is acceptable as a local dev tool. Users are running their own code with full Python capabilities, which is appropriate for a creative coding IDE.
 
 ### File System Access
 User sketches can open files, write files, etc.
@@ -736,6 +775,7 @@ User sketches can open files, write files, etc.
 **Mitigations:**
 1. Default save location is user's home directory or designated sketches folder.
 2. No automatic execution of files on open.
+3. Temp directory for sketch modules isolated from user files.
 
 ### Memory Safety
 NumPy buffer shared between Python and Qt must not cause segfaults.
@@ -865,3 +905,4 @@ The implementation will be considered complete and successful when:
 ## Version History
 
 - **v1.0 (2025-12-30):** Initial draft for review
+- **v1.1 (2025-12-30):** Updated code execution strategy from `exec()` to importlib-based module loading for better isolation, natural import support, and cleaner error handling
