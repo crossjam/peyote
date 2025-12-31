@@ -1,7 +1,7 @@
 # Processing-like IDE Implementation Plan
 
 **Created:** 2025-12-30  
-**Last Updated:** 2025-12-30 (Removed Drawing API implementation; focused on IDE UI and sketch execution)  
+**Last Updated:** 2025-12-31 (Confirmed single-window IDE; added multi-tab package architecture)  
 **Status:** Draft for Review
 
 ---
@@ -98,18 +98,7 @@ MainWindow (QMainWindow)
 
 **Overview:** Main window for code/controls, separate floating window for display (closer to Processing).
 
-**Architecture:**
-```
-MainWindow (QMainWindow)
-├── Toolbar (QToolBar)
-├── Tab Widget (QTabWidget) - Code Editors
-└── Bottom Panel (QSplitter)
-    ├── Messages Area (QTextEdit)
-    └── Console Area (QTextEdit)
-
-DisplayWindow (QWidget)
-└── FramebufferWidget
-```
+**Status:** Not chosen for initial implementation. Single-window approach (Approach 1) selected instead.
 
 **Advantages:**
 - Matches Processing's UX more closely
@@ -127,6 +116,8 @@ DisplayWindow (QWidget)
 
 **Overview:** Start with Approach 1, but allow display pane to be "popped out" into separate window.
 
+**Status:** Future enhancement. Can be added after single-window IDE is stable.
+
 **Advantages:**
 - Best of both worlds
 - Flexibility for different workflows
@@ -139,26 +130,63 @@ DisplayWindow (QWidget)
 
 ## Recommended Approach
 
-**Approach 1 (Integrated Single-Window IDE)** is recommended for the initial implementation because:
+**Approach 1 (Integrated Single-Window IDE)** is the chosen approach for implementation:
 1. Simpler to implement and maintain
 2. Aligns with modern IDE conventions
 3. Qt's QSplitter provides excellent resizing UX
-4. Can evolve to Approach 3 in future if needed
-5. Better for small screens and laptops
+4. Better for small screens and laptops
+5. **Decision confirmed:** Single-window IDE with integrated display pane
+
+**Multi-Tab Architecture:**
+- Each tab represents its own Python module within a unified package
+- All tabs are treated as a single Python package, allowing cross-tab imports
+- Enables easy factoring of helper functions, classes, and utility code across tabs
+- Supports modular sketch development with shared code
 
 ---
 
 ## Alternative Approaches
 
+### Multi-Tab Package Architecture
+
+**Overview:** The IDE treats all open tabs as a unified Python package, enabling modular sketch development.
+
+**Structure:**
+```
+project_name/
+├── __init__.py          # Makes it a Python package
+├── main.py              # Tab 1: Main sketch with setup() and draw()
+├── helpers.py           # Tab 2: Helper functions
+├── classes.py           # Tab 3: Custom classes
+└── constants.py         # Tab 4: Shared constants
+```
+
+**Benefits:**
+- **Code Organization:** Separate concerns across multiple modules
+- **Reusability:** Define functions/classes once, use across tabs
+- **Cross-Module Imports:** `from helpers import calculate_position`
+- **Clean Architecture:** Factor complex sketches into manageable pieces
+- **Collaboration:** Team members can work on different modules
+
+**Execution Model:**
+- Main module (typically first tab) contains `setup()` and `draw()`
+- Other modules provide supporting code
+- All modules share the same namespace within the package
+- Runtime imports work naturally between modules
+
+---
+
 ### Code Execution Strategies
 
 #### Option A: Module Loading via importlib (Recommended)
-Load user code as Python modules using `importlib`, then introspect for Processing-like functions (`setup()`, `draw()`, etc.). Code entered in the IDE will be written to temporary files and loaded using this mechanism.
+Load user code as Python modules using `importlib`, then introspect for Processing-like functions (`setup()`, `draw()`, etc.). Code entered in the IDE will be written to package files and loaded using this mechanism.
 
 **Implementation:**
-- Save editor content to temporary `.py` file in a temp directory
-- Use `importlib.util.spec_from_file_location()` and `importlib.util.module_from_spec()` to load module
-- Introspect module for `setup` and `draw` functions using `hasattr()` or `getattr()`
+- Save each tab's content to a `.py` file in a project directory
+- Create `__init__.py` to establish package structure
+- Use `importlib.util.spec_from_file_location()` and `importlib.util.module_from_spec()` to load modules
+- Add project directory to `sys.path` for import resolution
+- Introspect main module for `setup` and `draw` functions using `hasattr()` or `getattr()`
 - Execute functions in controlled manner
 - Support module reloading for iterative development
 
@@ -279,7 +307,7 @@ VS Code's editor in a web view.
 ---
 
 ### Phase 2: Code Editor Widget
-**Goal:** Implement a functional Python code editor with syntax highlighting and line numbers.
+**Goal:** Implement a functional Python code editor with syntax highlighting, line numbers, and multi-tab support.
 
 **Tasks:**
 - [ ] Create `code_editor.py` with `CodeEditorWidget(QPlainTextEdit)` class
@@ -299,19 +327,28 @@ VS Code's editor in a web view.
   - [ ] New tab (Ctrl+N)
   - [ ] Close tab (Ctrl+W)
   - [ ] Switch tabs (Ctrl+Tab)
-  - [ ] "Untitled-1", "Untitled-2" naming
+  - [ ] Module naming: "module_1", "module_2", etc. (or user-defined)
   - [ ] Modified indicator (asterisk in tab title)
+- [ ] **Implement package structure for tabs:**
+  - [ ] Create a unique package directory for the current sketch project
+  - [ ] Each tab corresponds to a Python module file in that package
+  - [ ] Generate `__init__.py` to make it a proper Python package
+  - [ ] Track mapping between tabs and module files
+  - [ ] Support cross-module imports (e.g., `from module_2 import helper_function`)
 
 **Files to create:**
 - `src/peyote/ide/code_editor.py`
 - `src/peyote/ide/syntax_highlighter.py`
 - `src/peyote/ide/line_numbers.py`
+- `src/peyote/ide/tab_manager.py` (manages tab-to-module mapping)
 
 **Acceptance:**
 - Can type Python code with syntax highlighting
 - Line numbers display correctly
 - Multiple tabs can be created and managed
 - Tab switching works
+- Each tab has a unique module name
+- Tabs are saved as separate module files in a package directory
 
 ---
 
@@ -344,54 +381,62 @@ VS Code's editor in a web view.
 ---
 
 ### Phase 4: Code Execution Engine
-**Goal:** Load and execute user Python sketch modules using importlib.
+**Goal:** Load and execute user Python sketch modules as a unified package using importlib.
 
 **Tasks:**
 - [ ] Create `execution_engine.py` with `SketchExecutor` class
-- [ ] Implement temporary file management:
-  - [ ] Create temp directory for sketch modules (e.g., `~/.peyote/sketches/`)
-  - [ ] Write editor content to `.py` file in temp directory
-  - [ ] Generate unique module names to avoid conflicts
-- [ ] Implement module loading with importlib:
-  - [ ] Use `importlib.util.spec_from_file_location()` to create module spec
-  - [ ] Use `importlib.util.module_from_spec()` to load module
+- [ ] Implement package-based file management:
+  - [ ] Create project directory for current sketch (e.g., `~/.peyote/projects/project_name/`)
+  - [ ] Write each tab's content to a separate `.py` file (e.g., `module_1.py`, `module_2.py`)
+  - [ ] Generate `__init__.py` to make it a proper Python package
+  - [ ] Support user-defined module names (editable tab names)
+- [ ] Implement package loading with importlib:
+  - [ ] Add project directory to `sys.path` for import resolution
+  - [ ] Load main module using `importlib.util.spec_from_file_location()`
+  - [ ] Use `importlib.util.module_from_spec()` to create module
   - [ ] Execute module with `spec.loader.exec_module()`
-  - [ ] Introspect module for `setup` and `draw` functions using `hasattr()`
+  - [ ] Introspect for `setup` and `draw` functions using `hasattr()`
   - [ ] Support module reloading with `importlib.reload()` for iterative development
-- [ ] Implement `SketchExecutor.load_and_run(code_string)`:
-  - [ ] Save code to temporary file
-  - [ ] Load module using importlib
-  - [ ] Validate that module has required functions
+  - [ ] Support cross-module imports (modules can import from sibling modules in package)
+- [ ] Implement `SketchExecutor.load_and_run()`:
+  - [ ] Save all tab contents to their respective module files
+  - [ ] Identify the "main" module (first tab or designated main)
+  - [ ] Load main module using importlib
+  - [ ] Validate that main module has required functions
   - [ ] Call user's `setup()` once (if present)
   - [ ] Start timer to call user's `draw()` at ~60fps (if present)
   - [ ] Handle exceptions gracefully with full traceback
   - [ ] Route print statements to console widget (capture stdout)
 - [ ] Implement module lifecycle management:
   - [ ] Stop previous sketch before loading new one
-  - [ ] Cleanup old modules and temp files
+  - [ ] Reload all modified modules when Play is pressed
+  - [ ] Cleanup old modules from sys.modules
   - [ ] Handle reload on code changes (hot-reload)
 - [ ] Integrate with Display Widget:
   - [ ] Connect executor to FramebufferWidget
   - [ ] Allow sketch module to access the display widget for rendering
   - [ ] Update display after each draw() call
 - [ ] Implement Play/Stop button functionality:
-  - [ ] Play: save code, load module, start execution
-  - [ ] Stop: halt execution, unload module, clear display
+  - [ ] Play: save all tabs to package, load main module, start execution
+  - [ ] Stop: halt execution, unload modules, clear display
 
 **Files to create:**
 - `src/peyote/ide/execution_engine.py`
 - `src/peyote/ide/module_loader.py` (helper for importlib operations)
+- `src/peyote/ide/package_manager.py` (manages package structure and files)
 
 **Acceptance:**
-- Can write simple sketch with setup() and draw()
-- Play button runs the sketch by loading it as a module
-- Stop button halts execution and unloads module
+- Can write sketch across multiple tabs
+- Modules can import from each other (e.g., `from module_2 import MyClass`)
+- Play button runs the main module (first tab or designated)
+- Stop button halts execution and unloads all modules
 - Sketch code can access display widget for rendering
-- Errors show in console with proper tracebacks
-- Can reload sketch after code changes (hot-reload)
+- Errors show in console with proper tracebacks indicating which module failed
+- Can reload sketch after code changes in any tab (hot-reload)
 - Imports work naturally in sketch code (e.g., `import math`)
+- Helper functions/classes defined in one tab can be used in another
 
-**Note:** The specific API that sketches use for drawing is out of scope. This phase focuses on the module loading and execution infrastructure.
+**Note:** The specific API that sketches use for drawing is out of scope. This phase focuses on the package-based module loading and execution infrastructure.
 
 ---
 
@@ -432,38 +477,57 @@ VS Code's editor in a web view.
 ---
 
 ### Phase 6: File Operations
-**Goal:** Load and save Python sketch files.
+**Goal:** Load and save Python sketch packages (multi-file projects).
 
 **Tasks:**
 - [ ] Implement File menu actions:
-  - [ ] New (Ctrl+N) - clear editor
-  - [ ] Open (Ctrl+O) - file dialog, load .py file
-  - [ ] Save (Ctrl+S) - save current tab
-  - [ ] Save As (Ctrl+Shift+S) - save with new name
-  - [ ] Recent files list
+  - [ ] New Project (Ctrl+N) - create new multi-tab project
+  - [ ] Open Project (Ctrl+O) - load existing project directory
+  - [ ] Save Project (Ctrl+S) - save all tabs to project directory
+  - [ ] Save Project As (Ctrl+Shift+S) - save with new project name
+  - [ ] Open File in Tab - add single .py file as new tab
+  - [ ] Save Tab As - save individual tab to separate file
+  - [ ] Recent projects list
   - [ ] Exit (Ctrl+Q)
-- [ ] Implement sketch file management:
-  - [ ] Track file path per tab
-  - [ ] Update window title with current file name
-  - [ ] Prompt to save on close if modified
-  - [ ] Default save location (~/peyote-sketches or similar)
-- [ ] Create example sketches:
-  - [ ] `examples/basic_shapes.py`
-  - [ ] `examples/animation.py`
-  - [ ] `examples/mouse_interaction.py`
-- [ ] Add "Examples" menu to load bundled sketches
+- [ ] Implement project file management:
+  - [ ] Project directory structure: `project_name/` with module files and `__init__.py`
+  - [ ] Track project path and individual module file paths
+  - [ ] Update window title with project name
+  - [ ] Prompt to save on close if any tab is modified
+  - [ ] Default save location (`~/peyote-projects/` or similar)
+  - [ ] Auto-save project structure on tab changes
+- [ ] Implement tab/module file synchronization:
+  - [ ] Map each tab to its module file
+  - [ ] Save tab content to corresponding module file
+  - [ ] Load module files into tabs when opening project
+  - [ ] Track which tabs have unsaved changes
+- [ ] Create example projects:
+  - [ ] `examples/basic_project/` - single module with setup() and draw()
+  - [ ] `examples/multi_module/` - multiple tabs with shared utilities
+  - [ ] `examples/animation/` - animation example using helper modules
+- [ ] Add "Examples" menu to load bundled example projects
 
 **Files to create:**
-- `examples/basic_shapes.py`
-- `examples/animation.py`
-- `examples/mouse_interaction.py`
+- `examples/basic_project/__init__.py`
+- `examples/basic_project/main.py`
+- `examples/multi_module/__init__.py`
+- `examples/multi_module/main.py`
+- `examples/multi_module/helpers.py`
+- `examples/animation/__init__.py`
+- `examples/animation/main.py`
+- `src/peyote/ide/project_manager.py` (handles project loading/saving)
 
 **Files modified:**
 - `src/peyote/ide/ide_window.py`
 
 **Acceptance:**
-- Can open and save .py files
-- Unsaved changes are detected
+- Can create new projects with multiple tabs
+- Can open and save project directories
+- Each tab corresponds to a module file in the project
+- Unsaved changes are detected per tab
+- Example projects load correctly with all modules in separate tabs
+- Tabs maintain their names and content when project is reopened
+- Can add new tabs (new modules) to existing project
 - Example sketches load correctly
 
 ---
@@ -824,9 +888,9 @@ The implementation will be considered complete and successful when:
 
 ## Open Questions for Clarification
 
-1. **Display Widget Architecture:**
-   - Should display pane be detachable (like Processing)? Or always integrated?
-   - **Recommendation:** Start integrated, add detach feature later if needed.
+1. **Display Widget Architecture:** ✓ **Decided**
+   - Single-window IDE with integrated display pane (not detachable in v1)
+   - Can be added as future enhancement if needed
 
 2. **Frame Rate Control:**
    - Should frame rate be fixed at 60 FPS or configurable?
@@ -836,7 +900,11 @@ The implementation will be considered complete and successful when:
    - When draw() throws exception, should we halt execution or keep running and show error?
    - **Recommendation:** Halt execution, show error, allow user to fix and restart.
 
-4. **Sketch Module Interface:**
+4. **Main Module Designation:**
+   - Should the first tab always be the main module, or can users designate which tab is main?
+   - **Recommendation:** Start with first tab as main, add designation UI later if needed.
+
+5. **Sketch Module Interface:**
    - How should sketches access the display widget for rendering?
    - Should there be a standard module/API they import, or is it passed as a parameter?
    - **Recommendation:** To be determined based on drawing API design (out of scope for this plan).
@@ -859,3 +927,4 @@ The implementation will be considered complete and successful when:
 - **v1.0 (2025-12-30):** Initial draft for review
 - **v1.1 (2025-12-30):** Updated code execution strategy from `exec()` to importlib-based module loading for better isolation, natural import support, and cleaner error handling
 - **v1.2 (2025-12-30):** Removed Drawing API implementation from scope; focused plan on IDE UI components and sketch module loading/execution infrastructure. Drawing API design deferred to separate effort.
+- **v1.3 (2025-12-31):** Confirmed single-window IDE approach. Enhanced multi-tab architecture: all tabs treated as unified Python package enabling cross-module imports, shared utilities, and modular sketch development. Updated Phases 2, 4, and 6 to reflect package-based project structure.
