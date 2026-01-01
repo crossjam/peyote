@@ -24,7 +24,4 @@ def setup_logging() -> None:
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
     )
 
-    # Set debug level for IDE modules
-    logger.level("peyote.ide", "DEBUG")
-
     logger.info(f"Logging initialized. Log file: {log_file}")
