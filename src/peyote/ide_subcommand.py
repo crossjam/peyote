@@ -9,7 +9,7 @@ cli = typer.Typer()
 
 
 @cli.command()
-def ide(
+def start(
     file: str = typer.Option(
         None,
         "--file",

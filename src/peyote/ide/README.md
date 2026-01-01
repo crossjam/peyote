@@ -16,13 +16,13 @@ A Processing-like integrated development environment for creating generative art
 Launch the IDE:
 
 ```bash
-peyote ide ide
+peyote ide start
 ```
 
 Or open a specific file:
 
 ```bash
-peyote ide ide --file my_sketch.py
+peyote ide start --file my_sketch.py
 ```
 
 ## Writing Sketches

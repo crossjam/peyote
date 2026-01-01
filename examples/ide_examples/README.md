@@ -14,7 +14,7 @@ The `basic_sketch` example demonstrates the fundamental structure of a Peyote sk
 To open an example in the IDE:
 
 ```bash
-peyote ide ide --example basic_sketch
+peyote ide start --example basic_sketch
 ```
 
 Or simply launch the IDE and use File > Open Project to navigate to an example directory.
