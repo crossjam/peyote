@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from .code_editor import CodeEditorWidget
+from .display_widget import FramebufferWidget
 from .logging_setup import setup_logging
 from .styles import get_stylesheet
 from .tab_manager import TabManager
@@ -155,10 +156,8 @@ class ProcessingIDEWindow(QMainWindow):
         # Set initial sizes for left pane (editor: 70%, bottom: 30%)
         left_pane.setSizes([600, 200])
 
-        # Right pane (display widget - placeholder for now)
-        self.display_widget = QWidget()
-        self.display_widget.setMinimumWidth(300)
-        self.display_widget.setStyleSheet("background-color: #1e1e1e;")
+        # Right pane with display widget
+        self.display_widget = FramebufferWidget(w=640, h=360)
 
         # Add both panes to main splitter
         main_splitter.addWidget(left_pane)
