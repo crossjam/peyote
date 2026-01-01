@@ -33,7 +33,7 @@ class ProcessingIDEWindow(QMainWindow):
         """Initialize the IDE window."""
         super().__init__()
         self.setWindowTitle("Peyote IDE")
-        self.resize(1400, 900)
+        self.resize(1200, 800)  # Reduced from 1400x900 for more compact initial size
 
         # Apply dark theme stylesheet
         self.setStyleSheet(get_stylesheet())
@@ -91,7 +91,9 @@ class ProcessingIDEWindow(QMainWindow):
         """Create the toolbar with Play/Stop buttons."""
         toolbar = QToolBar("Main Toolbar")
         toolbar.setMovable(False)
+        toolbar.setContentsMargins(0, 0, 0, 0)  # Remove any margins
         self.addToolBar(toolbar)
+        self.setUnifiedTitleAndToolBarOnMac(True)  # Reduce spacing on macOS
 
         # Play button
         self.play_button = QPushButton("▶ Play")

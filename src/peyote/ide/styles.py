@@ -6,11 +6,30 @@ QMainWindow {
     background-color: #7CA5C4;
 }
 
+QMenuBar {
+    background-color: #7CA5C4;
+    color: #000000;
+    border: none;
+    padding: 2px;
+    margin: 0px;
+}
+
+QMenuBar::item {
+    background-color: transparent;
+    padding: 3px 10px;
+    margin: 0px;
+}
+
+QMenuBar::item:selected {
+    background-color: #5a85a4;
+}
+
 QToolBar {
     background-color: #7CA5C4;
     border: none;
     spacing: 2px;
     padding: 2px;
+    margin: 0px;
     min-height: 32px;
     max-height: 32px;
 }
@@ -38,13 +57,23 @@ QPushButton:disabled {
     color: #c0c0c0;
 }
 
+QTabWidget {
+    border: none;
+    margin: 0px;
+    padding: 0px;
+}
+
 QTabWidget::pane {
     border: 2px solid #5a85a4;
     background-color: #ffffff;
+    margin: 0px;
+    padding: 0px;
+    top: 0px;
 }
 
 QTabBar {
     alignment: left;
+    background-color: #7CA5C4;
 }
 
 QTabBar::tab {
@@ -54,6 +83,7 @@ QTabBar::tab {
     border-bottom: none;
     padding: 4px 10px;
     margin-right: 2px;
+    margin-top: 0px;
 }
 
 QTabBar::tab:selected {
