@@ -165,6 +165,7 @@ class ProcessingIDEWindow(QMainWindow):
 
         # Right pane with display widget
         self.display_widget = FramebufferWidget(w=640, h=360)
+        self.display_widget.setObjectName("display_widget")
 
         # Add both panes to main splitter
         main_splitter.addWidget(left_pane)

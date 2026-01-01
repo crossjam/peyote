@@ -9,8 +9,10 @@ QMainWindow {
 QToolBar {
     background-color: #3c3f41;
     border: none;
-    spacing: 3px;
-    padding: 5px;
+    spacing: 2px;
+    padding: 2px;
+    min-height: 32px;
+    max-height: 32px;
 }
 
 QPushButton {
@@ -18,8 +20,9 @@ QPushButton {
     color: #ffffff;
     border: 1px solid #5a5a5a;
     border-radius: 3px;
-    padding: 5px 15px;
-    min-width: 60px;
+    padding: 3px 10px;
+    min-width: 50px;
+    max-height: 24px;
 }
 
 QPushButton:hover {
@@ -36,15 +39,16 @@ QPushButton:disabled {
 }
 
 QTabWidget::pane {
-    border: 1px solid #3c3f41;
+    border: 2px solid #555555;
     background-color: #2b2b2b;
 }
 
 QTabBar::tab {
     background-color: #3c3f41;
     color: #a9b7c6;
-    border: 1px solid #2b2b2b;
-    padding: 5px 10px;
+    border: 1px solid #555555;
+    border-bottom: none;
+    padding: 4px 10px;
     margin-right: 2px;
 }
 
@@ -60,7 +64,7 @@ QTabBar::tab:hover {
 QPlainTextEdit, QTextEdit {
     background-color: #2b2b2b;
     color: #a9b7c6;
-    border: 1px solid #3c3f41;
+    border: 2px solid #555555;
     font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
     font-size: 12pt;
 }
@@ -70,25 +74,34 @@ QTextEdit#console {
     color: #cccccc;
     font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
     font-size: 11pt;
+    border: 2px solid #555555;
 }
 
 QTextEdit#messages {
     background-color: #3c3f41;
     color: #a9b7c6;
     font-size: 10pt;
+    border: 2px solid #555555;
 }
 
 QSplitter::handle {
-    background-color: #3c3f41;
+    background-color: #555555;
+    width: 2px;
+    height: 2px;
 }
 
 QSplitter::handle:hover {
-    background-color: #5a5a5a;
+    background-color: #7a7a7a;
 }
 
 QMenuBar {
     background-color: #3c3f41;
     color: #a9b7c6;
+    padding: 2px;
+}
+
+QMenuBar::item {
+    padding: 2px 8px;
 }
 
 QMenuBar::item:selected {
@@ -98,7 +111,7 @@ QMenuBar::item:selected {
 QMenu {
     background-color: #3c3f41;
     color: #a9b7c6;
-    border: 1px solid #2b2b2b;
+    border: 1px solid #555555;
 }
 
 QMenu::item:selected {
@@ -108,6 +121,12 @@ QMenu::item:selected {
 QStatusBar {
     background-color: #3c3f41;
     color: #a9b7c6;
+    border-top: 1px solid #555555;
+}
+
+/* Style for the FramebufferWidget border */
+QWidget#display_widget {
+    border: 2px solid #555555;
 }
 """
 
