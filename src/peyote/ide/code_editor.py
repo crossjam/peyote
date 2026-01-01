@@ -145,7 +145,7 @@ class CodeEditorWidget(QPlainTextEdit):
 
         if not self.isReadOnly():
             selection = QTextEdit.ExtraSelection()
-            line_color = QColor("#2B2B2B").lighter(120)
+            line_color = QColor("#E8F2FF")  # Light blue highlight for current line
             selection.format.setBackground(line_color)
             selection.format.setProperty(
                 QTextFormat.Property.FullWidthSelection,
@@ -165,7 +165,7 @@ class CodeEditorWidget(QPlainTextEdit):
 
         """
         painter = QPainter(self.line_number_area)
-        painter.fillRect(event.rect(), QColor("#313335"))
+        painter.fillRect(event.rect(), QColor("#E8E8E8"))  # Light gray for line number area
 
         block = self.firstVisibleBlock()
         block_number = block.blockNumber()
@@ -175,7 +175,7 @@ class CodeEditorWidget(QPlainTextEdit):
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
                 number = str(block_number + 1)
-                painter.setPen(QColor("#606366"))
+                painter.setPen(QColor("#606060"))  # Dark gray for line numbers
                 painter.drawText(
                     0,
                     int(top),

@@ -16,26 +16,26 @@ class PythonSyntaxHighlighter(QSyntaxHighlighter):
         """
         super().__init__(parent)
 
-        # Define formatting styles
+        # Define formatting styles for light background
         keyword_format = QTextCharFormat()
-        keyword_format.setForeground(QColor("#CC7832"))  # Orange
+        keyword_format.setForeground(QColor("#0033B3"))  # Dark blue for keywords
         keyword_format.setFontWeight(QFont.Weight.Bold)
 
         builtin_format = QTextCharFormat()
-        builtin_format.setForeground(QColor("#8888C6"))  # Purple
+        builtin_format.setForeground(QColor("#871094"))  # Purple for builtins
 
         string_format = QTextCharFormat()
-        string_format.setForeground(QColor("#6A8759"))  # Green
+        string_format.setForeground(QColor("#067D17"))  # Green for strings
 
         comment_format = QTextCharFormat()
-        comment_format.setForeground(QColor("#808080"))  # Gray
+        comment_format.setForeground(QColor("#8C8C8C"))  # Gray for comments
         comment_format.setFontItalic(True)
 
         number_format = QTextCharFormat()
-        number_format.setForeground(QColor("#6897BB"))  # Blue
+        number_format.setForeground(QColor("#1750EB"))  # Blue for numbers
 
         function_format = QTextCharFormat()
-        function_format.setForeground(QColor("#FFC66D"))  # Yellow
+        function_format.setForeground(QColor("#00627A"))  # Teal for functions
 
         # Define highlighting rules
         self.highlighting_rules = []
