@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QMainWindow,
-    QPlainTextEdit,
     QPushButton,
     QSplitter,
     QTabWidget,
@@ -18,8 +17,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .code_editor import CodeEditorWidget
 from .logging_setup import setup_logging
 from .styles import get_stylesheet
+from .tab_manager import TabManager
 
 
 class ProcessingIDEWindow(QMainWindow):
@@ -33,6 +34,9 @@ class ProcessingIDEWindow(QMainWindow):
 
         # Apply dark theme stylesheet
         self.setStyleSheet(get_stylesheet())
+
+        # Initialize tab manager (will be set after creating UI)
+        self.tab_manager: TabManager | None = None
 
         # Create UI components
         self._create_menu_bar()
@@ -48,6 +52,7 @@ class ProcessingIDEWindow(QMainWindow):
 
         # File menu
         file_menu = menubar.addMenu("&File")
+        file_menu.addAction("&New Tab", self._on_new_tab, "Ctrl+T")
         file_menu.addAction("&New Project")
         file_menu.addAction("&Open Project...")
         file_menu.addAction("&Save Project")
@@ -118,10 +123,11 @@ class ProcessingIDEWindow(QMainWindow):
         self.editor_tabs.setTabsClosable(True)
         self.editor_tabs.setMovable(True)
 
-        # Add a default tab with placeholder editor
-        default_editor = QPlainTextEdit()
-        default_editor.setPlaceholderText("# Write your Python code here...")
-        self.editor_tabs.addTab(default_editor, "sketch")
+        # Initialize tab manager
+        self.tab_manager = TabManager(self.editor_tabs)
+
+        # Add a default tab with code editor
+        self.tab_manager.add_new_tab("sketch")
 
         left_pane.addWidget(self.editor_tabs)
 
@@ -186,6 +192,12 @@ class ProcessingIDEWindow(QMainWindow):
 
         """
         self.console_area.append(text)
+
+    def _on_new_tab(self) -> None:
+        """Handle new tab action."""
+        if self.tab_manager:
+            self.tab_manager.add_new_tab()
+            self.show_message("New tab created")
 
 
 def launch_ide() -> int:
