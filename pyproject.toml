@@ -13,8 +13,8 @@ dependencies = [
     "pydantic_settings",
     "numpy",
     "pyside6",
-    "pygame-ce",
-    "pycairo",
+    "pillow",
+    "platformdirs",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -46,6 +46,7 @@ dev = [
     "poethepoet",
     "pytest",
     "pytest-cov",
+    "pytest-qt",
     "ruff",
     "ty",
     "toml-cli",
