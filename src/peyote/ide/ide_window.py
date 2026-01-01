@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from .code_editor import CodeEditorWidget
 from .display_widget import FramebufferWidget
+from .execution_engine import SketchExecutor
 from .logging_setup import setup_logging
 from .styles import get_stylesheet
 from .tab_manager import TabManager
@@ -36,14 +37,18 @@ class ProcessingIDEWindow(QMainWindow):
         # Apply dark theme stylesheet
         self.setStyleSheet(get_stylesheet())
 
-        # Initialize tab manager (will be set after creating UI)
+        # Initialize tab manager and executor (will be set after creating UI)
         self.tab_manager: TabManager | None = None
+        self.executor: SketchExecutor | None = None
 
         # Create UI components
         self._create_menu_bar()
         self._create_toolbar()
         self._create_main_layout()
         self._create_status_bar()
+
+        # Initialize executor after display widget is created
+        self._create_executor()
 
         logger.info("IDE window initialized")
 
@@ -89,12 +94,14 @@ class ProcessingIDEWindow(QMainWindow):
         # Play button
         self.play_button = QPushButton("▶ Play")
         self.play_button.setToolTip("Run the sketch (Ctrl+R)")
+        self.play_button.clicked.connect(self._on_play)
         toolbar.addWidget(self.play_button)
 
         # Stop button
         self.stop_button = QPushButton("⏹ Stop")
         self.stop_button.setToolTip("Stop the sketch (Ctrl+.)")
         self.stop_button.setEnabled(False)
+        self.stop_button.clicked.connect(self._on_stop)
         toolbar.addWidget(self.stop_button)
 
         toolbar.addSeparator()
@@ -192,11 +199,67 @@ class ProcessingIDEWindow(QMainWindow):
         """
         self.console_area.append(text)
 
+    def _create_executor(self) -> None:
+        """Create the sketch executor."""
+        self.executor = SketchExecutor(
+            self.display_widget,
+            console_callback=self.show_console,
+        )
+        logger.info("Sketch executor created")
+
     def _on_new_tab(self) -> None:
         """Handle new tab action."""
         if self.tab_manager:
             self.tab_manager.add_new_tab()
             self.show_message("New tab created")
+
+    def _on_play(self) -> None:
+        """Handle Play button click."""
+        if not self.tab_manager or not self.executor:
+            return
+
+        # Collect code from all tabs
+        modules = {}
+        for i in range(self.editor_tabs.count()):
+            editor = self.editor_tabs.widget(i)
+            if isinstance(editor, CodeEditorWidget):
+                tab_name = self.tab_manager.get_tab_name(i)
+                # Remove asterisk from modified tabs
+                tab_name = tab_name.rstrip("*")
+                code = editor.toPlainText()
+                modules[tab_name] = code
+
+        if not modules:
+            self.show_message("No code to run")
+            return
+
+        # Get the name of the first tab as the main module
+        main_module_name = self.tab_manager.get_tab_name(0).rstrip("*")
+
+        # Clear console
+        self.console_area.clear()
+        self.messages_area.clear()
+
+        # Run the sketch
+        self.show_message("Starting sketch...")
+        success = self.executor.load_and_run(modules, main_module_name)
+
+        if success:
+            self.play_button.setEnabled(False)
+            self.stop_button.setEnabled(True)
+            self.show_message("Sketch running")
+        else:
+            self.show_message("Failed to start sketch")
+
+    def _on_stop(self) -> None:
+        """Handle Stop button click."""
+        if not self.executor:
+            return
+
+        self.executor.stop()
+        self.play_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+        self.show_message("Sketch stopped")
 
 
 def launch_ide() -> int:
