@@ -132,7 +132,7 @@ class ProcessingIDEWindow(QMainWindow):
         self.editor_tabs = QTabWidget()
         self.editor_tabs.setTabsClosable(True)
         self.editor_tabs.setMovable(True)
-        self.editor_tabs.setTabPosition(QTabWidget.TabPosition.West)  # Left-align tabs
+        # Tabs will be at the top (North position) and left-aligned via stylesheet
 
         # Initialize tab manager
         self.tab_manager = TabManager(self.editor_tabs)

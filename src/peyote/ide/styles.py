@@ -43,6 +43,10 @@ QTabWidget::pane {
     background-color: #ffffff;
 }
 
+QTabBar {
+    alignment: left;
+}
+
 QTabBar::tab {
     background-color: #6A95B4;
     color: #ffffff;
