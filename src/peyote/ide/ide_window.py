@@ -4,6 +4,7 @@ import sys
 
 from loguru import logger
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -64,7 +65,8 @@ class ProcessingIDEWindow(QMainWindow):
         file_menu.addAction("&Save Project")
         file_menu.addAction("Save Project &As...")
         file_menu.addSeparator()
-        file_menu.addAction("&Quit")
+        quit_action = file_menu.addAction("&Quit", QApplication.quit)
+        quit_action.setShortcut(QKeySequence.StandardKey.Quit)  # Cmd+Q on macOS, Ctrl+Q elsewhere
 
         # Edit menu
         edit_menu = menubar.addMenu("&Edit")
