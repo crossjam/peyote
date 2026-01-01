@@ -1,7 +1,7 @@
 # Processing-like IDE Implementation Plan
 
 **Created:** 2025-12-30  
-**Last Updated:** 2026-01-01 (Added platformdirs for OS-specific app directories)  
+**Last Updated:** 2026-01-01 (Added loguru-config for TOML-based logging configuration)  
 **Status:** Draft for Review
 
 ---
@@ -289,7 +289,12 @@ VS Code's editor in a web view.
   - [ ] Initialize user data directory for auto-saved sketches
   - [ ] Initialize user config directory for logging configuration
   - [ ] Create directory structure on first run
-  - [ ] Set up logging configuration in config directory
+- [ ] Set up logging with loguru-config:
+  - [ ] Create default `logging.toml` configuration file in config directory
+  - [ ] Configure loguru with sensible defaults (file logging, console logging)
+  - [ ] Log file location: `{data_dir}/peyote-ide.log`
+  - [ ] Use `loguru-config` to load configuration from TOML
+  - [ ] Set appropriate log levels per module (DEBUG for IDE, INFO for general)
 - [ ] Create new module: `src/peyote/ide/`
 - [ ] Create `ide_window.py` with `ProcessingIDEWindow(QMainWindow)` class
 - [ ] Implement toolbar with Play/Stop buttons (QPushButton)
@@ -306,6 +311,8 @@ VS Code's editor in a web view.
 - `src/peyote/ide/ide_window.py`
 - `src/peyote/ide/styles.py` (optional: Qt stylesheet)
 - `src/peyote/ide/app_dirs.py` (platformdirs wrapper for app directories)
+- `src/peyote/ide/logging_setup.py` (loguru-config initialization)
+- `{config_dir}/logging.toml` (default TOML logging configuration)
 
 **Acceptance:**
 - Window opens and displays all UI components
@@ -313,6 +320,8 @@ VS Code's editor in a web view.
 - Window is resizable
 - Application directories are created on first run
 - Logging configuration directory is initialized
+- Default logging.toml config file is created
+- Loguru is configured and logging to file and console works
 
 ---
 
@@ -757,6 +766,7 @@ Create a suite of canonical sketches and reference images to test the execution 
 - **Pillow**: GIF export and image comparison in tests
 - **platformdirs**: OS-specific user application directories
 - **loguru**: Logging (already in dependencies)
+- **loguru-config**: TOML-based loguru configuration management
 - **typer**: CLI framework (already in dependencies)
 
 ### Development
@@ -771,6 +781,7 @@ dependencies = [
     # ... existing ...
     "pillow",       # Add this
     "platformdirs", # Add this
+    "loguru-config @ git+https://github.com/crossjam/loguru-config.git", # Add this
 ]
 
 [dependency-groups]
@@ -794,17 +805,45 @@ The IDE uses `platformdirs` to manage OS-specific user application directories w
 - **macOS:** `~/Library/Application Support/dev.pirateninja.peyote/`
 - **Windows:** `%LOCALAPPDATA%\dev.pirateninja.peyote\`
 
+**Logging Configuration:**
+The IDE uses `loguru-config` (https://github.com/crossjam/loguru-config) for managing loguru logging configuration via TOML files.
+
+**Default logging configuration file:** `{config_dir}/logging.toml`
+
+**Initial configuration** (created on first run):
+```toml
+# logging.toml - Default loguru configuration for peyote IDE
+
+[loguru]
+# Main log file in user data directory
+handlers = [
+    { sink = "{data_dir}/peyote-ide.log", level = "INFO", rotation = "10 MB", retention = "7 days" },
+    { sink = "stderr", level = "WARNING", format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>" }
+]
+
+# Log levels per module
+[loguru.levels]
+"peyote.ide" = "DEBUG"
+"peyote.ide.execution_engine" = "DEBUG"
+```
+
 **Usage:**
 ```python
 from platformdirs import user_data_dir, user_config_dir
+from loguru_config import load_config
+from pathlib import Path
 
 # Sketch packages not explicitly saved by user
 data_dir = user_data_dir("dev.pirateninja.peyote", "pirateninja")
 sketches_dir = Path(data_dir) / "sketches"
 
-# Logging configuration files
+# Logging configuration
 config_dir = user_config_dir("dev.pirateninja.peyote", "pirateninja")
-log_config = Path(config_dir) / "logging.conf"
+log_config_file = Path(config_dir) / "logging.toml"
+
+# Load loguru configuration from TOML
+if log_config_file.exists():
+    load_config(log_config_file)
 ```
 
 ---
@@ -973,3 +1012,4 @@ The implementation will be considered complete and successful when:
 - **v1.2 (2025-12-30):** Removed Drawing API implementation from scope; focused plan on IDE UI components and sketch module loading/execution infrastructure. Drawing API design deferred to separate effort.
 - **v1.3 (2025-12-31):** Confirmed single-window IDE approach. Enhanced multi-tab architecture: all tabs treated as unified Python package enabling cross-module imports, shared utilities, and modular sketch development. Updated Phases 2, 4, and 6 to reflect package-based project structure.
 - **v1.4 (2026-01-01):** Added `platformdirs` dependency for OS-specific application directory management. App name: `dev.pirateninja.peyote`. Auto-saved sketches stored in user data directory, logging configuration in user config directory. Updated Phases 1, 4, 6 and Dependencies section.
+- **v1.5 (2026-01-01):** Added `loguru-config` dependency for TOML-based logging configuration. Default `logging.toml` file created in config directory on first run with sensible defaults (file logging to data directory, console logging). Updated Phase 1 and Dependencies section.
