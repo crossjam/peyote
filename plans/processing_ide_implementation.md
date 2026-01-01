@@ -1,7 +1,7 @@
 # Processing-like IDE Implementation Plan
 
 **Created:** 2025-12-30  
-**Last Updated:** 2025-12-31 (Confirmed single-window IDE; added multi-tab package architecture)  
+**Last Updated:** 2026-01-01 (Added platformdirs for OS-specific app directories)  
 **Status:** Draft for Review
 
 ---
@@ -183,6 +183,7 @@ Load user code as Python modules using `importlib`, then introspect for Processi
 
 **Implementation:**
 - Save each tab's content to a `.py` file in a project directory
+- Use `platformdirs` for managing auto-saved sketch locations
 - Create `__init__.py` to establish package structure
 - Use `importlib.util.spec_from_file_location()` and `importlib.util.module_from_spec()` to load modules
 - Add project directory to `sys.path` for import resolution
@@ -199,10 +200,11 @@ Load user code as Python modules using `importlib`, then introspect for Processi
 - Supports relative imports and package structure
 - Can use standard Python debugging tools
 - Module reloading allows iterative development without restart
+- OS-appropriate directory management via platformdirs
 
 **Cons:**
 - Slightly more complex than `exec()`
-- Need to manage temporary files
+- Need to manage project files and directories
 - Module caching considerations (must use `importlib.reload()`)
 
 #### Option B: Subprocess Execution
@@ -279,10 +281,15 @@ VS Code's editor in a web view.
 
 ## Implementation Plan
 
-### Phase 1: Core IDE Window Structure
-**Goal:** Create the main window shell with all UI components laid out (non-functional).
+### Phase 1: Core IDE Window Structure and Application Setup
+**Goal:** Create the main window shell with all UI components laid out (non-functional) and initialize application directories.
 
 **Tasks:**
+- [ ] Set up application directories with platformdirs:
+  - [ ] Initialize user data directory for auto-saved sketches
+  - [ ] Initialize user config directory for logging configuration
+  - [ ] Create directory structure on first run
+  - [ ] Set up logging configuration in config directory
 - [ ] Create new module: `src/peyote/ide/`
 - [ ] Create `ide_window.py` with `ProcessingIDEWindow(QMainWindow)` class
 - [ ] Implement toolbar with Play/Stop buttons (QPushButton)
@@ -298,11 +305,14 @@ VS Code's editor in a web view.
 - `src/peyote/ide/__init__.py`
 - `src/peyote/ide/ide_window.py`
 - `src/peyote/ide/styles.py` (optional: Qt stylesheet)
+- `src/peyote/ide/app_dirs.py` (platformdirs wrapper for app directories)
 
 **Acceptance:**
 - Window opens and displays all UI components
 - Splitters are draggable and resize correctly
 - Window is resizable
+- Application directories are created on first run
+- Logging configuration directory is initialized
 
 ---
 
@@ -385,11 +395,13 @@ VS Code's editor in a web view.
 
 **Tasks:**
 - [ ] Create `execution_engine.py` with `SketchExecutor` class
-- [ ] Implement package-based file management:
-  - [ ] Create project directory for current sketch (e.g., `~/.peyote/projects/project_name/`)
+- [ ] Implement package-based file management with platformdirs:
+  - [ ] Use `platformdirs.user_data_dir("dev.pirateninja.peyote", "pirateninja")` for auto-saved sketches
+  - [ ] Create sketches directory: `{data_dir}/sketches/project_name/`
   - [ ] Write each tab's content to a separate `.py` file (e.g., `module_1.py`, `module_2.py`)
   - [ ] Generate `__init__.py` to make it a proper Python package
   - [ ] Support user-defined module names (editable tab names)
+  - [ ] Track whether project is user-saved or auto-saved to app directory
 - [ ] Implement package loading with importlib:
   - [ ] Add project directory to `sys.path` for import resolution
   - [ ] Load main module using `importlib.util.spec_from_file_location()`
@@ -494,8 +506,10 @@ VS Code's editor in a web view.
   - [ ] Track project path and individual module file paths
   - [ ] Update window title with project name
   - [ ] Prompt to save on close if any tab is modified
-  - [ ] Default save location (`~/peyote-projects/` or similar)
-  - [ ] Auto-save project structure on tab changes
+  - [ ] **User-saved projects:** Default to `~/peyote-projects/` or user-chosen location
+  - [ ] **Auto-saved projects:** Use platformdirs data directory for unsaved sketches
+  - [ ] Auto-save project structure on tab changes to app directory
+  - [ ] Allow promoting auto-saved project to user-saved location (Save As)
 - [ ] Implement tab/module file synchronization:
   - [ ] Map each tab to its module file
   - [ ] Save tab content to corresponding module file
@@ -741,6 +755,7 @@ Create a suite of canonical sketches and reference images to test the execution 
 - **PySide6**: Qt bindings for Python (already in dependencies)
 - **numpy**: Array manipulation (already in dependencies)
 - **Pillow**: GIF export and image comparison in tests
+- **platformdirs**: OS-specific user application directories
 - **loguru**: Logging (already in dependencies)
 - **typer**: CLI framework (already in dependencies)
 
@@ -754,7 +769,8 @@ Create a suite of canonical sketches and reference images to test the execution 
 [project]
 dependencies = [
     # ... existing ...
-    "pillow",  # Add this
+    "pillow",       # Add this
+    "platformdirs", # Add this
 ]
 
 [dependency-groups]
@@ -762,6 +778,33 @@ dev = [
     # ... existing ...
     "pytest-qt",  # Add this
 ]
+```
+
+### Application Directories
+
+The IDE uses `platformdirs` to manage OS-specific user application directories with the app name `dev.pirateninja.peyote`:
+
+**User Data Directory** (for sketch packages):
+- **Linux:** `~/.local/share/dev.pirateninja.peyote/`
+- **macOS:** `~/Library/Application Support/dev.pirateninja.peyote/`
+- **Windows:** `%LOCALAPPDATA%\dev.pirateninja.peyote\`
+
+**User Config Directory** (for logging configuration):
+- **Linux:** `~/.config/dev.pirateninja.peyote/`
+- **macOS:** `~/Library/Application Support/dev.pirateninja.peyote/`
+- **Windows:** `%LOCALAPPDATA%\dev.pirateninja.peyote\`
+
+**Usage:**
+```python
+from platformdirs import user_data_dir, user_config_dir
+
+# Sketch packages not explicitly saved by user
+data_dir = user_data_dir("dev.pirateninja.peyote", "pirateninja")
+sketches_dir = Path(data_dir) / "sketches"
+
+# Logging configuration files
+config_dir = user_config_dir("dev.pirateninja.peyote", "pirateninja")
+log_config = Path(config_dir) / "logging.conf"
 ```
 
 ---
@@ -774,7 +817,7 @@ dev = [
 **Mitigations:**
 1. **Documentation:** Clearly document that the IDE is a local development tool, not for running untrusted code.
 2. **Module Isolation:** Each sketch runs as a separate module in a controlled namespace.
-3. **Temporary File Management:** Sketch files stored in dedicated temp directory with proper cleanup.
+3. **Application Directory Management:** Sketch files stored in OS-appropriate application directories managed by `platformdirs`.
 4. **No Automatic Execution:** Sketches only run when user explicitly clicks Play button.
 5. **Future Enhancement:** Consider restricted execution environment (e.g., RestrictedPython) if needed.
 
@@ -792,7 +835,8 @@ User sketches can open files, write files, etc.
 **Mitigations:**
 1. Default save location is user's home directory or designated sketches folder.
 2. No automatic execution of files on open.
-3. Temp directory for sketch modules isolated from user files.
+3. Auto-saved sketches stored in OS-appropriate application data directory via `platformdirs`.
+4. User-saved projects stored in user-chosen locations.
 
 ### Memory Safety
 NumPy buffer shared between Python and Qt must not cause segfaults.
@@ -928,3 +972,4 @@ The implementation will be considered complete and successful when:
 - **v1.1 (2025-12-30):** Updated code execution strategy from `exec()` to importlib-based module loading for better isolation, natural import support, and cleaner error handling
 - **v1.2 (2025-12-30):** Removed Drawing API implementation from scope; focused plan on IDE UI components and sketch module loading/execution infrastructure. Drawing API design deferred to separate effort.
 - **v1.3 (2025-12-31):** Confirmed single-window IDE approach. Enhanced multi-tab architecture: all tabs treated as unified Python package enabling cross-module imports, shared utilities, and modular sketch development. Updated Phases 2, 4, and 6 to reflect package-based project structure.
+- **v1.4 (2026-01-01):** Added `platformdirs` dependency for OS-specific application directory management. App name: `dev.pirateninja.peyote`. Auto-saved sketches stored in user data directory, logging configuration in user config directory. Updated Phases 1, 4, 6 and Dependencies section.
