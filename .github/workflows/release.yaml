@@ -133,7 +133,7 @@ jobs:
           path: dist/
 
       - name: Auto-generate Changelog
-        uses: BobAnkh/auto-generate-changelog@v1.3.0
+        uses: BobAnkh/auto-generate-changelog@v1.3.1
         with:
           REPO_NAME: 'crossjam/peyote'
           ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
